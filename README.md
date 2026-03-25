@@ -1,5 +1,3 @@
-[![Build Status](https://travis-ci.com/Comcast/caption-inspector.svg?branch=master)](https://travis-ci.com/Comcast/caption-inspector)
-
 Caption Inspector
 =================
 
@@ -63,8 +61,8 @@ Running against the caption file `NightOfTheLivingDead.mcc` demonstrates decodin
 Building the Caption Inspector Executable Locally with MOV Support
 ------------------------------------------------------------------
 
-Caption Inspector requires the inclusion of the [GPAC][https://gpac.wp.imt.fr/] Library. Specifically a modified library of GPAC which
-gets linked as a shared object is required. This library is located [here][https://github.com/Comcast/gpac-caption-extractor] and must be pulled and built.
+Caption Inspector requires the inclusion of the [GPAC](https://gpac.wp.imt.fr/) Library. Specifically a modified library of GPAC which
+gets linked as a shared object is required. This library is located [here](https://github.com/Comcast/gpac-caption-extractor) and must be pulled and built.
 Once the GPAC library has been built the same instructions are used as above.
 
 ```

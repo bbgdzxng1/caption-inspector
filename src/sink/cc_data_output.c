@@ -18,6 +18,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 #include "debug.h"
@@ -90,6 +91,22 @@ LinkInfo CcDataOutInitialize( Context* rootCtxPtr ) {
     ctxPtr->cea708BytesRemaining = 0;
     buildOutputPath(rootCtxPtr->config.inputFilename, rootCtxPtr->config.outputDirectory, "ccd", ctxPtr->ccdFileName);
 
+    /* SCC artifact initialization */
+    ctxPtr->sccFp[0] = NULL;
+    ctxPtr->sccFp[1] = NULL;
+    ctxPtr->sccHeaderWritten[0] = FALSE;
+    ctxPtr->sccHeaderWritten[1] = FALSE;
+    ctxPtr->sccHasPending[0] = FALSE;
+    ctxPtr->sccHasPending[1] = FALSE;
+    ctxPtr->sccLastFrame[0] = 0;
+    ctxPtr->sccLastFrame[1] = 0;
+    ctxPtr->sccPendingTc[0][0] = '\0';
+    ctxPtr->sccPendingTc[1][0] = '\0';
+    ctxPtr->sccPendingWords[0][0] = '\0';
+    ctxPtr->sccPendingWords[1][0] = '\0';
+    buildOutputPath(rootCtxPtr->config.inputFilename, rootCtxPtr->config.outputDirectory, SCC_FIELD1_EXT, ctxPtr->sccFileName[0]);
+    buildOutputPath(rootCtxPtr->config.inputFilename, rootCtxPtr->config.outputDirectory, SCC_FIELD2_EXT, ctxPtr->sccFileName[1]);
+
     LinkInfo linkInfo;
     linkInfo.linkType = CC_DATA___TEXT_FILE;
     linkInfo.sourceType = DATA_TYPE_CC_DATA;
@@ -121,6 +138,14 @@ uint8 CcDataOutProcNextBuffer( void* rootCtxPtr, Buffer* buffPtr ) {
     ASSERT(((Context*)rootCtxPtr)->ccDataOutputCtxPtr);
     CcDataOutputCtx* ctxPtr = ((Context*)rootCtxPtr)->ccDataOutputCtxPtr;
     int len;
+
+    Context* rctx = (Context*)rootCtxPtr;
+
+    /* SCC accumulation for this buffer (per field) */
+    char sccWords[2][SCC_MAX_LINE_CHARS];
+    boolean sccHasWords[2] = { FALSE, FALSE };
+    sccWords[0][0] = '\0';
+    sccWords[1][0] = '\0';
 
     if( ctxPtr->fp == NULL ) {
         LOG(DEBUG_LEVEL_INFO, DBG_CCD_OUT, "Creating new CCD File for Output: %s", ctxPtr->ccdFileName);
@@ -227,6 +252,18 @@ uint8 CcDataOutProcNextBuffer( void* rootCtxPtr, Buffer* buffPtr ) {
             } else {
                 sprintf(lineOut.element[lineOut.numElements].hexStr, "P%s:%02X%02X", ccTypeStr[ccType], ccData1, ccData2);
             }
+
+              /* SCC capture: valid 608 field words only */
+              if( (rctx->config.artifacts == TRUE) &&
+                  (ccType == CC_DATA_TYPE__FIELD_1 || ccType == CC_DATA_TYPE__FIELD_2) ) {
+                  uint16 w = (uint16)(((ccData1 & 0x7F) << 8) | (ccData2 & 0x7F));
+                  if( w != 0x0000 ) {
+                      char tmp[8];
+                      snprintf(tmp, sizeof(tmp), " %04x", (unsigned int)w);
+                      strncat(sccWords[ccType], tmp, (SCC_MAX_LINE_CHARS - strlen(sccWords[ccType]) - 1));
+                      sccHasWords[ccType] = TRUE;
+                  }
+              }
             switch( ccType ) {
                 case CC_DATA_TYPE__FIELD_1:
                 case CC_DATA_TYPE__FIELD_2:
@@ -305,6 +342,53 @@ uint8 CcDataOutProcNextBuffer( void* rootCtxPtr, Buffer* buffPtr ) {
     ASSERT(lineOut.numElements == 0 );
     writeToFile(ctxPtr->fp, "\n\n");
 
+    /* SCC emission (per field, sequential-frame packed) */
+    if( rctx->config.artifacts == TRUE ) {
+        CaptionTime ftc = buffPtr->captionTime;
+        uint32 frameNum = 0;
+        if( ftc.source == CAPTION_TIME_FRAME_NUMBERING ) {
+            frameNum = timeCodeToFrame(&ftc);
+        } else {
+            uint32 totalMs = (uint32)((((ftc.hour * 60u) + ftc.minute) * 60u + ftc.second) * 1000u + ftc.millisecond);
+            uint32 fps100 = ftc.frameRatePerSecTimesOneHundred;
+            frameNum = (uint32)(((uint64)totalMs * (uint64)fps100 + 50000u) / 100000u);
+            memset(&ftc, 0, sizeof(CaptionTime));
+            ftc.frameRatePerSecTimesOneHundred = buffPtr->captionTime.frameRatePerSecTimesOneHundred;
+            ftc.dropframe = buffPtr->captionTime.dropframe;
+            ftc.source = CAPTION_TIME_FRAME_NUMBERING;
+            frameToTimeCode(frameNum, ftc.frameRatePerSecTimesOneHundred, &ftc);
+        }
+        char tcStr[24];
+        snprintf(tcStr, sizeof(tcStr), "%02d:%02d:%02d:%02d", ftc.hour, ftc.minute, ftc.second, ftc.frame);
+        for( uint8 f = 0; f < 2; f++ ) {
+            if( sccHasWords[f] == FALSE ) continue;
+            if( ctxPtr->sccFp[f] == NULL ) {
+                ctxPtr->sccFp[f] = fileOutputInit(ctxPtr->sccFileName[f]);
+                writeToFile(ctxPtr->sccFp[f], "%s", SCC_HEADER_TEXT);
+                ctxPtr->sccHeaderWritten[f] = TRUE;
+            }
+            if( ctxPtr->sccHasPending[f] == FALSE ) {
+                strncpy(ctxPtr->sccPendingTc[f], tcStr, sizeof(ctxPtr->sccPendingTc[f]) - 1);
+                ctxPtr->sccPendingTc[f][sizeof(ctxPtr->sccPendingTc[f]) - 1] = '\0';
+                strncpy(ctxPtr->sccPendingWords[f], sccWords[f], sizeof(ctxPtr->sccPendingWords[f]) - 1);
+                ctxPtr->sccPendingWords[f][sizeof(ctxPtr->sccPendingWords[f]) - 1] = '\0';
+                ctxPtr->sccHasPending[f] = TRUE;
+                ctxPtr->sccLastFrame[f] = frameNum;
+            } else if( frameNum == (ctxPtr->sccLastFrame[f] + 1) ) {
+                strncat(ctxPtr->sccPendingWords[f], sccWords[f], sizeof(ctxPtr->sccPendingWords[f]) - strlen(ctxPtr->sccPendingWords[f]) - 1);
+                ctxPtr->sccLastFrame[f] = frameNum;
+            } else {
+                writeToFile(ctxPtr->sccFp[f], "%s%s\n", ctxPtr->sccPendingTc[f], ctxPtr->sccPendingWords[f]);
+                strncpy(ctxPtr->sccPendingTc[f], tcStr, sizeof(ctxPtr->sccPendingTc[f]) - 1);
+                ctxPtr->sccPendingTc[f][sizeof(ctxPtr->sccPendingTc[f]) - 1] = '\0';
+                strncpy(ctxPtr->sccPendingWords[f], sccWords[f], sizeof(ctxPtr->sccPendingWords[f]) - 1);
+                ctxPtr->sccPendingWords[f][sizeof(ctxPtr->sccPendingWords[f]) - 1] = '\0';
+                ctxPtr->sccHasPending[f] = TRUE;
+                ctxPtr->sccLastFrame[f] = frameNum;
+            }
+        }
+    }
+
     FreeBuffer(buffPtr);
     return PIPELINE_SUCCESS;
 } // CcDataOutProcNextBuffer()
@@ -330,9 +414,25 @@ uint8 CcDataOutShutdown( void* rootCtxPtr ) {
     ASSERT(rootCtxPtr);
     ASSERT(((Context*)rootCtxPtr)->ccDataOutputCtxPtr);
 
-    closeFile(((Context*)rootCtxPtr)->ccDataOutputCtxPtr->fp);
+    CcDataOutputCtx* ctxPtr = ((Context*)rootCtxPtr)->ccDataOutputCtxPtr;
 
-    free(((Context*)rootCtxPtr)->ccDataOutputCtxPtr);
+    /* Flush pending SCC lines and close SCC files */
+    for( uint8 f = 0; f < 2; f++ ) {
+        if( ctxPtr->sccHasPending[f] == TRUE && ctxPtr->sccFp[f] != NULL ) {
+            writeToFile(ctxPtr->sccFp[f], "%s%s\n", ctxPtr->sccPendingTc[f], ctxPtr->sccPendingWords[f]);
+            ctxPtr->sccHasPending[f] = FALSE;
+            ctxPtr->sccPendingTc[f][0] = '\0';
+            ctxPtr->sccPendingWords[f][0] = '\0';
+        }
+        if( ctxPtr->sccFp[f] != NULL ) {
+            closeFile(ctxPtr->sccFp[f]);
+            ctxPtr->sccFp[f] = NULL;
+        }
+    }
+
+    closeFile(ctxPtr->fp);
+
+    free(ctxPtr);
     ((Context*)rootCtxPtr)->ccDataOutputCtxPtr = NULL;
     return PIPELINE_SUCCESS;
 } // CcDataOutShutdown()

@@ -227,6 +227,17 @@ typedef struct {
     uint8 cea708Code;
     uint8 cea708BytesRemaining;
     char ccdFileName[MAX_FILE_NAME_LEN];
+
+    /* SCC artifacts (one file per EIA-608 field). */
+    FILE* sccFp[2];                      /* [0]=Field1, [1]=Field2 */
+    boolean sccHeaderWritten[2];
+    char sccFileName[2][MAX_FILE_NAME_LEN];
+
+    /* Sequential-frame packed SCC output per field. */
+    boolean sccHasPending[2];
+    uint32 sccLastFrame[2];
+    char sccPendingTc[2][24];            /* "HH:MM:SS:FF" */
+    char sccPendingWords[2][8192];       /* " hhhh hhhh ..." */
 } CcDataOutputCtx;
 
 typedef struct {

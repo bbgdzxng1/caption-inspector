@@ -23,6 +23,19 @@
 #include "pipeline_utils.h"
 
 /*----------------------------------------------------------------------------*/
+/*-- SCC Artifact Output ------------------------------------------------------*/
+/*----------------------------------------------------------------------------*/
+/* Emit one SCC file per EIA-608 field (Field 1 and Field 2). */
+#define SCC_FIELD1_EXT "F1.scc"
+#define SCC_FIELD2_EXT "F2.scc"
+
+/* Standard Scenarist SCC header */
+#define SCC_HEADER_TEXT "Scenarist_SCC V1.0\n\n"
+
+/* Buffer size for a packed SCC line (sequential-frame packed words). */
+#define SCC_MAX_LINE_CHARS 8192
+
+/*----------------------------------------------------------------------------*/
 /*--                               Constants                                --*/
 /*----------------------------------------------------------------------------*/
 #define UNKOWN_CHANNEL                                           0

@@ -176,7 +176,7 @@ uint8 CcDataOutProcNextBuffer( void* rootCtxPtr, Buffer* buffPtr ) {
         writeToFile(ctxPtr->fp, " |    \\         /   \\                     /  \\                                    /\n");
         writeToFile(ctxPtr->fp, " |     Timestamp     ----- Hex Data ------    ------------ Decoded Data ----------\n");
         writeToFile(ctxPtr->fp, " |\n");
-        writeToFile(ctxPtr->fp, " | Timestamp - The timestamp has three different formats. Each of the formats start with Hour:Minute:Second, but end with Millisecond or Frame, depending on the punctuation preceeding the last number.\n");
+        writeToFile(ctxPtr->fp, " | Timestamp - The timestamp has three different formats. Each of the formats start with Hour:Minute:Second, but end with Millisecond or Frame, depending on the punctuation preceding the last number.\n");
         writeToFile(ctxPtr->fp, " |\n");
         writeToFile(ctxPtr->fp, " | 00:01:22:14  - Frame Number with No Drop Frame (1 Hour, 22 Seconds, 14 Frames)\n");
         writeToFile(ctxPtr->fp, " | 00:01:22;05  - Frame Number with Drop Frame (1 Hour, 22 Seconds, 5 Frames)\n");
@@ -186,12 +186,12 @@ uint8 CcDataOutProcNextBuffer( void* rootCtxPtr, Buffer* buffPtr ) {
         writeToFile(ctxPtr->fp, " |\n");
         writeToFile(ctxPtr->fp, " |            {cc_valid}{cc_type}:{cc_data_1}{cc_data_2}\n");
         writeToFile(ctxPtr->fp, " |\n");
-        writeToFile(ctxPtr->fp, " |            cc_valid - This field determines whether the subsequent fields should considered valid and be interperated. This field will either be 'F' for Valid Line 21, 'P' for Valid DTVCC, or 'X' for Invalid.\n");
+        writeToFile(ctxPtr->fp, " |            cc_valid - This field determines whether the subsequent fields should be considered valid and interpreted. This field will either be 'F' for Valid Line 21, 'P' for Valid DTVCC, or 'X' for Invalid.\n");
         writeToFile(ctxPtr->fp, " |            cc_type - This field determines the type of data that will be in cc_data_1 and cc_data_2. This field can have the following values: '1' Line 21 Field 1 Data, '2' Line 21 Field 2 Data,\n");
         writeToFile(ctxPtr->fp, " |                      'S' DTVCC Channel Packet Data Start, 'D' DTVCC Channel Packet Data. \n");
-        writeToFile(ctxPtr->fp, " |            cc_data_1 / cc_data_2 - These fields are the actual two bytes of payload data, which are represented in hexidecimal.\n");
+        writeToFile(ctxPtr->fp, " |            cc_data_1 / cc_data_2 - These fields are the actual two bytes of payload data, which are represented in hexadecimal.\n");
         writeToFile(ctxPtr->fp, " |\n");
-        writeToFile(ctxPtr->fp, " | Decoded Data - The Decoded Data is an inline decode of Hex Data in the corresponding Closed Captioning Construct. This is a partial decode of the DTVCC / Line 21 repesentations. The following\n");
+        writeToFile(ctxPtr->fp, " | Decoded Data - The Decoded Data is an inline decode of Hex Data in the corresponding Closed Captioning Construct. This is a partial decode of the DTVCC / Line 21 representations. The following\n");
         writeToFile(ctxPtr->fp, " |                tables can be used to understand the decoding.\n");
         writeToFile(ctxPtr->fp, " |\n");
         writeToFile(ctxPtr->fp, " ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/\n");
